@@ -1,27 +1,350 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="UTF-8">
-        <title>Letters</title>
-    </head>
-    <body>
-        <h1>Letters:Zeline</h1>
-        <p>We write from left to right</p>
-        <div id="output"></div>
-        <script>
-        const outputEl = document.getElementById("output");
-        document.addEventListener("keydown", function(event) { 
-       
-            
-            if (event.key === "Backspace") {
-            outputEl.textContent = outputEl.textContent.slice(0, -1);
-            } else if (event.key === "d" || event.key === "D") {
-            outputEl.textContent += "BARK!";
-            } else {
-            outputEl.textContent += event.key;
-}
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Falling Letters — Physics Stack</title>
+  <style>
+    :root {
+      --char-size: 26px;
+      --cols: 22;
+      --pile-height: 440px;
+      --fg: #e5e7eb;
+      --bg: #000000;
+      --accent: #60a5fa;
+      --muted: #9ca3af;
+    }
+    * { box-sizing: border-box }
+    html, body { height: 100% }
+    body {
+      margin: 0;
+      font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+      color: var(--fg);
+      background: var(--bg);
+      display: grid;
+      place-items: center;
+    }
+    .app { width: min(1100px, 94vw); }
+    h1 { font-size: clamp(18px, 2.2vw, 28px); margin: 18px 0 6px }
+    p { margin: 0 0 14px; color: var(--muted) }
+    .controls {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .controls label {
+      font-size: 14px;
+      color: #d1d5db;
+    }
+    .controls input[type="number"] {
+      width: 6rem;
+      padding: 6px 8px;
+      border: 1px solid #374151;
+      border-radius: 10px;
+      background: #0a0a0a;
+      color: #e5e7eb;
+    }
+    .controls button {
+      padding: 6px 14px;
+      font-size: 14px;
+      border-radius: 8px;
+      border: 1px solid #374151;
+      background: #1f2937;
+      color: #e5e7eb;
+      cursor: pointer;
+    }
+    .controls button:hover {
+      background: #374151;
+    }
+    .stage {
+      position: relative;
+      border: 1px solid #1f2937;
+      border-radius: 16px;
+      background: #0a0a0a;
+      padding: 14px;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, .45);
+    }
+    .typing-line {
+      position: relative;
+      height: calc(var(--char-size) * 1.6);
+      display: flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 10px;
+      background: #0b0b0b;
+      border: 1px dashed #374151;
+      overflow: hidden;
+      font-size: var(--char-size);
+      line-height: 1;
+      white-space: pre;
+    }
+    .typing-prefix { color: #9ca3af; margin-right: 6px }
+    .caret {
+      width: 2px;
+      height: 70%;
+      background: var(--accent);
+      margin-left: 2px;
+      animation: blink 1.05s steps(2, end) infinite;
+    }
+    @keyframes blink { 50% { opacity: 0 } }
+    .pile {
+      position: relative;
+      margin-top: 12px;
+      height: var(--pile-height);
+      border-radius: 12px;
+      background: #000;
+      border: 1px solid #111;
+      overflow: hidden;
+    }
+    .legend {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    .kbd {
+      padding: 2px 6px;
+      border: 1px solid #374151;
+      border-bottom-width: 2px;
+      border-radius: 6px;
+      background: #0a0a0a;
+    }
+    canvas { display: block; width: 100%; height: 100%; cursor: none; }
+  </style>
+</head>
+<body tabindex="0">
+  <div class="app">
+    <h1>Falling Letters — Type and Watch Words Stack</h1>
+    <p>Modes: <b>1</b>=Drag • <b>2</b>=Explosion • <b>3</b>=Magnet — mouse works in lower half of canvas</p>
 
+    <div class="controls">
+      <label>Characters per line:
+        <input id="colsInput" type="number" min="6" max="60" value="22" />
+      </label>
+      <label>Character size (px):
+        <input id="charSizeInput" type="number" min="16" max="56" value="26" />
+      </label>
+      <label>Gravity:
+        <input id="gravInput" type="number" step="0.1" min="0" max="5" value="1.2" />
+      </label>
+      <button id="resetBtn">Reset</button>
+      <span class="legend">
+        <span class="kbd">Backspace</span> delete • <span class="kbd">Enter</span> drop line
+      </span>
+    </div>
+
+    <div class="stage">
+      <div class="typing-line">
+        <span class="typing-prefix">›</span><span id="typed"></span><span class="caret"></span>
+      </div>
+      <div class="pile">
+        <canvas id="scene" width="900" height="440" aria-label="physics scene"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+  <script>
+    const { Engine, Render, Runner, Bodies, World, Composite, Body, Events, Mouse, MouseConstraint, Vector } = Matter;
+
+    const canvas = document.getElementById('scene');
+    const engine = Engine.create();
+    const render = Render.create({
+      canvas,
+      engine,
+      options: {
+        width: canvas.width,
+        height: canvas.height,
+        background: '#000000',
+        wireframes: false,
+        pixelRatio: window.devicePixelRatio || 1
+      }
+    });
+    const runner = Runner.create();
+
+    let mode = 1; // 1=drag, 2=explosion, 3=magnet
+    const state = {
+      cols: 22,
+      charSize: 26,
+      gravity: 1.2,
+      buffer: ''
+    };
+    engine.gravity.y = state.gravity;
+
+    const ctx = canvas.getContext('2d');
+    const mouse = Mouse.create(canvas);
+    const cursor = { x: 0, y: 0 };
+    canvas.addEventListener('mousemove', e => {
+      const rect = canvas.getBoundingClientRect();
+      cursor.x = e.clientX - rect.left;
+      cursor.y = e.clientY - rect.top;
+    });
+
+    window.addEventListener('keydown', e => {
+      if (e.key === '1') mode = 1;
+      if (e.key === '2') mode = 2;
+      if (e.key === '3') mode = 3;
+    });
+
+    canvas.addEventListener('click', e => {
+      if (mode !== 2) return;
+      if (cursor.y < canvas.height / 2) return;
+      const bodies = Composite.allBodies(engine.world);
+      bodies.forEach(b => {
+        if (!b.isStatic) {
+          const dx = b.position.x - cursor.x;
+          const dy = b.position.y - cursor.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 120) {
+            const force = Vector.mult(Vector.normalise({ x: dx, y: dy }), 0.02);
+            Body.applyForce(b, b.position, force);
+          }
+        }
+      });
+    });
+
+    Events.on(engine, 'beforeUpdate', () => {
+      if (mode !== 3) return;
+      const bodies = Composite.allBodies(engine.world);
+      bodies.forEach(b => {
+        if (!b.isStatic && cursor.y > canvas.height / 2) {
+          const dx = cursor.x - b.position.x;
+          const dy = cursor.y - b.position.y;
+          const distSq = dx * dx + dy * dy;
+          if (distSq < 20000) {
+            const force = Vector.mult(Vector.normalise({ x: dx, y: dy }), 0.0003);
+            Body.applyForce(b, b.position, force);
+          }
+        }
+      });
+    });
+
+    Events.on(render, 'afterRender', () => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cursor.x, cursor.y, 12, 0, 2 * Math.PI);
+      ctx.strokeStyle = ['#60f', '#0f0', '#f33'][mode - 1];
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    });
+
+    const mConstraint = MouseConstraint.create(engine, {
+      mouse,
+      constraint: {
+        stiffness: 0.15,
+        render: { visible: false }
+      }
+    });
+    World.add(engine.world, mConstraint);
+
+    const margin = 24, thickness = 40;
+    function rebuildWalls() {
+      const W = render.options.width;
+      const H = render.options.height;
+      const floor = Bodies.rectangle(W / 2, H + thickness / 2 - 2, W, thickness, { isStatic: true });
+      const left = Bodies.rectangle(-thickness / 2 + margin, H / 2, thickness, H, { isStatic: true });
+      const right = Bodies.rectangle(W + thickness / 2 - margin, H / 2, thickness, H, { isStatic: true });
+      World.add(engine.world, [floor, left, right]);
+    }
+    rebuildWalls();
+
+    Render.run(render);
+    Runner.run(runner, engine);
+
+    Events.on(render, 'afterRender', () => {
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#e5e7eb';
+      ctx.font = `${state.charSize}px ui-monospace, Menlo, Monaco, Consolas, monospace`;
+      Composite.allBodies(engine.world).forEach(b => {
+        const letter = b.plugin && b.plugin.letter;
+        if (!letter) return;
+        ctx.save();
+        ctx.translate(b.position.x, b.position.y);
+        ctx.rotate(b.angle);
+        ctx.fillText(letter === ' ' ? '·' : letter, 0, 2);
+        ctx.restore();
+      });
+      ctx.restore();
+    });
+
+    function dropWord(word, startCol) {
+      const W = render.options.width;
+      const cell = W / state.cols;
+      let col = startCol;
+      const bodies = [];
+      for (let i = 0; i < word.length; i++) {
+        const ch = word[i];
+        const x = Math.round(col * cell + cell / 2);
+        const y = -40;
+        const w = state.charSize * 0.8;
+        const h = state.charSize * 1.0;
+        const body = Bodies.rectangle(x, y, w, h, {
+          restitution: 0.15,
+          friction: 0.35,
+          frictionStatic: 0.9,
+          frictionAir: 0.02,
+          density: 0.001,
+          render: { visible: false }
         });
-        </script>
-    </body>
+        body.plugin = { letter: ch };
+        Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.25);
+        Body.setVelocity(body, { x: (Math.random() - 0.5) * 1.2, y: 0 });
+        bodies.push(body);
+        col = (col + 1) % state.cols;
+      }
+      World.add(engine.world, bodies);
+    }
+
+    function updateTyped() {
+      document.getElementById('typed').textContent = state.buffer;
+    }
+
+    document.addEventListener('keydown', (event) => {
+      if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+      const key = event.key;
+      if (key === 'Backspace') {
+        event.preventDefault();
+        state.buffer = state.buffer.slice(0, -1);
+        updateTyped();
+        return;
+      }
+      if (key === 'Enter') {
+        event.preventDefault();
+        dropWord(state.buffer, 0);
+        state.buffer = '';
+        updateTyped();
+        return;
+      }
+      if (key.length === 1) {
+        state.buffer += key;
+        updateTyped();
+        if (state.buffer.length > state.cols) {
+          const lastSpace = state.buffer.lastIndexOf(' ', state.cols - 1);
+          const cutIndex = lastSpace >= 0 ? lastSpace + 1 : 0;
+          const word = state.buffer.slice(cutIndex);
+          const startCol = cutIndex % state.cols;
+          state.buffer = state.buffer.slice(0, cutIndex);
+          updateTyped();
+          dropWord(word, startCol);
+        }
+      }
+    });
+
+    // Reset button logic
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      Composite.allBodies(engine.world).forEach(b => {
+        if (!b.isStatic) World.remove(engine.world, b);
+      });
+      state.buffer = '';
+      updateTyped();
+    });
+
+    window.addEventListener('load', () => document.body.focus());
+    window.addEventListener('resize', () => render.canvas.width = canvas.clientWidth);
+  </script>
+</body>
 </html>
