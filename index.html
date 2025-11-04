@@ -3,152 +3,34 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Falling Letters - Prototype</title>
-  <style>
-    :root {
-      --char-size: 26px;
-      --cols: 22;
-      --pile-height: 440px;
-      --fg: #e5e7eb;
-      --bg: #000000;
-      --accent: #60a5fa;
-      --muted: #9ca3af;
-    }
-    * { box-sizing: border-box }
-    html, body { height: 100% }
-    body {
-      margin: 0;
-      font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
-      color: var(--fg);
-      background: var(--bg);
-      display: grid;
-      place-items: center;
-    }
-    .app { width: min(1100px, 94vw); }
-    h1 { font-size: clamp(18px, 2.2vw, 28px); margin: 18px 0 6px }
-    p { margin: 0 0 14px; color: var(--muted) }
-    .controls {
-      display: flex;
-      gap: 14px;
-      align-items: center;
-      flex-wrap: wrap;
-      margin-bottom: 10px;
-    }
-    .controls label {
-      font-size: 14px;
-      color: #d1d5db;
-    }
-    .controls input[type="number"] {
-      width: 6rem;
-      padding: 6px 8px;
-      border: 1px solid #374151;
-      border-radius: 10px;
-      background: #0a0a0a;
-      color: #e5e7eb;
-    }
-    .controls button {
-      padding: 6px 14px;
-      font-size: 14px;
-      border-radius: 8px;
-      border: 1px solid #374151;
-      background: #1f2937;
-      color: #e5e7eb;
-      cursor: pointer;
-    }
-    .controls button:hover {
-      background: #374151;
-    }
-    .stage {
-      position: relative;
-      border: 1px solid #1f2937;
-      border-radius: 16px;
-      background: #0a0a0a;
-      padding: 14px;
-      box-shadow: 0 6px 24px rgba(0, 0, 0, .45);
-    }
-    .typing-line {
-      position: relative;
-      height: calc(var(--char-size) * 1.6);
-      display: flex;
-      align-items: center;
-      padding: 6px 10px;
-      border-radius: 10px;
-      background: #0b0b0b;
-      border: 1px dashed #374151;
-      overflow: hidden;
-      font-size: var(--char-size);
-      line-height: 1;
-      white-space: pre;
-    }
-    .typing-prefix { color: #9ca3af; margin-right: 6px }
-    .caret {
-      width: 2px;
-      height: 70%;
-      background: var(--accent);
-      margin-left: 2px;
-      animation: blink 1.05s steps(2, end) infinite;
-    }
-    @keyframes blink { 50% { opacity: 0 } }
-    .pile {
-      position: relative;
-      margin-top: 12px;
-      height: var(--pile-height);
-      border-radius: 12px;
-      background: #000;
-      border: 1px solid #111;
-      overflow: hidden;
-    }
-    .legend {
-      margin-top: 8px;
-      font-size: 12px;
-      color: #9ca3af;
-    }
-    .kbd {
-      padding: 2px 6px;
-      border: 1px solid #374151;
-      border-bottom-width: 2px;
-      border-radius: 6px;
-      background: #0a0a0a;
-    }
-    canvas { display: block; width: 100%; height: 100%; cursor: none; }
-  </style>
+  <title>ERROR 417</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
+
 <body tabindex="0">
-  <div class="app">
-    <h1>It's Falling Letters!</h1>
-    <p>Modes: <b>1</b>=Drag • <b>2</b>=Explosion • <b>3</b>=Magnet — mouse works in lower half of canvas</p>
-
-    <div class="controls">
-      <label>Characters per line:
-        <input id="colsInput" type="number" min="6" max="60" value="22" />
-      </label>
-      <label>Character size (px):
-        <input id="charSizeInput" type="number" min="16" max="56" value="26" />
-      </label>
-      <label>Gravity:
-        <input id="gravInput" type="number" step="0.1" min="0" max="5" value="1.2" />
-      </label>
-      <button id="resetBtn">Reset</button>
-      <span class="legend">
-        <span class="kbd">Backspace</span> delete • <span class="kbd">Enter</span> drop line
-      </span>
+  
+  <div id="mode-indicator">
+    <span>TAB</span> TOGGLE.MODE
+  </div>
+  <div class="terminal">
+    <div class="typing-line">
+      <span id="typed"></span><span class="caret"></span>
     </div>
-
-    <div class="stage">
-      <div class="typing-line">
-        <span class="typing-prefix">›</span><span id="typed"></span><span class="caret"></span>
-      </div>
-      <div class="pile">
-        <canvas id="scene" width="900" height="440" aria-label="physics scene"></canvas>
-      </div>
-    </div>
+    <canvas id="scene" width="1500" height="800"></canvas>
   </div>
 
+  <div class="crt-overlay"></div>
+
+  <div id="escape-overlay">
+    <div id="escape-text">congratulations, you've found the way out :) </div>
+    <button id="restart-button">restart</button>
+  </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
   <script>
     const { Engine, Render, Runner, Bodies, World, Composite, Body, Events, Mouse, MouseConstraint, Vector } = Matter;
 
     const canvas = document.getElementById('scene');
+    const ctx = canvas.getContext('2d');
     const engine = Engine.create();
     const render = Render.create({
       canvas,
@@ -156,23 +38,21 @@
       options: {
         width: canvas.width,
         height: canvas.height,
-        background: '#000000',
+        background: 'transparent', // let CRT background show through
         wireframes: false,
         pixelRatio: window.devicePixelRatio || 1
       }
     });
+
     const runner = Runner.create();
+    Render.run(render);
+    Runner.run(runner, engine);
+    engine.gravity.y = 1.2;
 
-    let mode = 1; // 1=drag, 2=explosion, 3=magnet
-    const state = {
-      cols: 22,
-      charSize: 26,
-      gravity: 1.2,
-      buffer: ''
-    };
-    engine.gravity.y = state.gravity;
+    let mode = 1; // 1=drag, 2=magnet, 3=blower
+    let isFloating = false; // --- NEW: Added floating state ---
+    const state = { cols: 22, charSize: 26, buffer: '' };
 
-    const ctx = canvas.getContext('2d');
     const mouse = Mouse.create(canvas);
     const cursor = { x: 0, y: 0 };
     canvas.addEventListener('mousemove', e => {
@@ -181,15 +61,24 @@
       cursor.y = e.clientY - rect.top;
     });
 
+    // --- UPDATED: Listen for 'Tab' and 'Escape' ---
     window.addEventListener('keydown', e => {
-      if (e.key === '1') mode = 1;
-      if (e.key === '2') mode = 2;
-      if (e.key === '3') mode = 3;
+      if (e.key === 'Tab') {
+        e.preventDefault(); // Stop browser from changing focus
+        mode = (mode % 3) + 1; // Cycles 1 -> 2 -> 3 -> 1
+      }
+      
+      // --- NEW: Added 'Escape' key logic ---
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        isFloating = true;
+        document.getElementById('escape-overlay').style.display = 'flex';
+      }
     });
 
+    // explosion (on click)
     canvas.addEventListener('click', e => {
-      if (mode !== 2) return;
-      if (cursor.y < canvas.height / 2) return;
+      if (isFloating) return; // Don't explode if floating
       const bodies = Composite.allBodies(engine.world);
       bodies.forEach(b => {
         if (!b.isStatic) {
@@ -204,88 +93,158 @@
       });
     });
 
-    Events.on(engine, 'beforeUpdate', () => {
-      if (mode !== 3) return;
-      const bodies = Composite.allBodies(engine.world);
-      bodies.forEach(b => {
-        if (!b.isStatic && cursor.y > canvas.height / 2) {
-          const dx = cursor.x - b.position.x;
-          const dy = cursor.y - b.position.y;
-          const distSq = dx * dx + dy * dy;
-          if (distSq < 20000) {
-            const force = Vector.mult(Vector.normalise({ x: dx, y: dy }), 0.0003);
-            Body.applyForce(b, b.position, force);
-          }
-        }
-      });
-    });
-
-    Events.on(render, 'afterRender', () => {
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(cursor.x, cursor.y, 12, 0, 2 * Math.PI);
-      ctx.strokeStyle = ['#60f', '#0f0', '#f33'][mode - 1];
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.restore();
-    });
-
+    // --- drag constraint, disabled by default ---
     const mConstraint = MouseConstraint.create(engine, {
       mouse,
-      constraint: {
-        stiffness: 0.15,
-        render: { visible: false }
-      }
+      constraint: { stiffness: 0.15, render: { visible: false } },
+      enabled: false // Disabled by default, our 'beforeUpdate' loop will manage it
     });
     World.add(engine.world, mConstraint);
 
-    const margin = 24, thickness = 40;
-    function rebuildWalls() {
-      const W = render.options.width;
-      const H = render.options.height;
-      const floor = Bodies.rectangle(W / 2, H + thickness / 2 - 2, W, thickness, { isStatic: true });
-      const left = Bodies.rectangle(-thickness / 2 + margin, H / 2, thickness, H, { isStatic: true });
-      const right = Bodies.rectangle(W + thickness / 2 - margin, H / 2, thickness, H, { isStatic: true });
-      World.add(engine.world, [floor, left, right]);
-    }
-    rebuildWalls();
+    // --- UPDATED: Main physics loop to handle all modes OR floating ---
+    Events.on(engine, 'beforeUpdate', () => {
+      
+      // --- NEW: Floating logic takes priority ---
+      if (isFloating) {
+        engine.gravity.y = 0; // Turn off gravity
+        mConstraint.enabled = false; // Disable dragging
+        
+        const bodies = Composite.allBodies(engine.world);
+        bodies.forEach(b => {
+          if (!b.isStatic) {
+            // Apply a tiny random "drift" force to make them float around
+            const force = { 
+              x: (Math.random() - 0.5) * 0.002, 
+              y: (Math.random() - 0.5) * 0.002 
+            };
+            Body.applyForce(b, b.position, force);
+          }
+        });
+        return; // Skip the normal mode logic
+      }
 
-    Render.run(render);
-    Runner.run(runner, engine);
+      // --- Original Mode Logic ---
+      
+      // Set drag constraint active only for mode 1
+      mConstraint.enabled = (mode === 1);
 
+      const bodies = Composite.allBodies(engine.world);
+      const magnetRadiusSq = 20000; // Shared radius for magnet/blower
+      const magnetStrength = 0.005; // Shared strength (You increased this)
+
+      // Mode 2: Magnet (Pull)
+      if (mode === 2) {
+        bodies.forEach(b => {
+          if (!b.isStatic) {
+            const dx = cursor.x - b.position.x;
+            const dy = cursor.y - b.position.y;
+            const distSq = dx * dx + dy * dy;
+            if (distSq < magnetRadiusSq) {
+              const force = Vector.mult(Vector.normalise({ x: dx, y: dy }), magnetStrength);
+              Body.applyForce(b, b.position, force);
+            }
+          }
+        });
+      }
+      // Mode 3: Blower (Push)
+      else if (mode === 3) {
+        bodies.forEach(b => {
+          if (!b.isStatic) {
+            const dx = b.position.x - cursor.x; 
+            const dy = b.position.y - cursor.y;
+            const distSq = dx * dx + dy * dy;
+            if (distSq < magnetRadiusSq) {
+              const force = Vector.mult(Vector.normalise({ x: dx, y: dy }), magnetStrength);
+              Body.applyForce(b, b.position, force);
+            }
+          }
+        });
+      }
+    });
+
+
+    // walls
+    const W = render.options.width;
+    const H = render.options.height;
+    const thickness = 40;
+    const invisibleWall = { isStatic: true, render: { visible: false } };
+
+    const floor = Bodies.rectangle(W / 2, H + thickness / 2 - 2, W, thickness, invisibleWall);
+    const left = Bodies.rectangle(-thickness / 2, H / 2, thickness, H, invisibleWall);
+    const right = Bodies.rectangle(W + thickness / 2, H / 2, thickness, H, invisibleWall);
+
+    World.add(engine.world, [floor, left, right]);
+
+
+    // draw text + cursor indicator
     Events.on(render, 'afterRender', () => {
       ctx.save();
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#e5e7eb';
+      ctx.fillStyle = '#00ff80';
+      ctx.shadowColor = '#00ff80';
+      ctx.shadowBlur = 8;
       ctx.font = `${state.charSize}px ui-monospace, Menlo, Monaco, Consolas, monospace`;
+
       Composite.allBodies(engine.world).forEach(b => {
         const letter = b.plugin && b.plugin.letter;
         if (!letter) return;
         ctx.save();
         ctx.translate(b.position.x, b.position.y);
         ctx.rotate(b.angle);
-        ctx.fillText(letter === ' ' ? '·' : letter, 0, 2);
+        ctx.fillText(letter, 0, 2);
         ctx.restore();
       });
+
+      // cursor ring
+      ctx.beginPath();
+      ctx.arc(cursor.x, cursor.y, 10, 0, 2 * Math.PI);
+      
+      ctx.strokeStyle = ['#00ff80', '#FFFFFF', '#0000FF'][mode - 1];
+      
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
       ctx.restore();
     });
 
-    function dropWord(word, startCol) {
-      const W = render.options.width;
+    // typing logic
+    const typedSpan = document.getElementById('typed');
+
+    // Gets a random number between 1 and 100
+    function getRandomLimit() {
+      return Math.floor(Math.random() * 100) + 1;
+    }
+
+    // Set the initial limit
+    let currentCharLimit = getRandomLimit();
+
+    // A new function to handle the "fall" logic
+    function triggerFall() {
+      if (state.buffer.length === 0 || isFloating) return; // Don't fall if empty or floating
+      dropWord(state.buffer);
+      state.buffer = '';
+      updateTyped();
+      currentCharLimit = getRandomLimit(); // Set a new random limit for next time
+    }
+    
+    function updateTyped() {
+      typedSpan.textContent = state.buffer;
+    }
+
+    function dropWord(word) {
       const cell = W / state.cols;
-      let col = startCol;
+      let col = 0;
       const bodies = [];
       for (let i = 0; i < word.length; i++) {
         const ch = word[i];
         const x = Math.round(col * cell + cell / 2);
         const y = -40;
         const w = state.charSize * 0.8;
-        const h = state.charSize * 1.0;
+        const h = state.charSize;
         const body = Bodies.rectangle(x, y, w, h, {
           restitution: 0.15,
           friction: 0.35,
-          frictionStatic: 0.9,
           frictionAir: 0.02,
           density: 0.001,
           render: { visible: false }
@@ -299,52 +258,45 @@
       World.add(engine.world, bodies);
     }
 
-    function updateTyped() {
-      document.getElementById('typed').textContent = state.buffer;
-    }
-
+    // --- UPDATED KEYDOWN LISTENER (This is for typing) ---
     document.addEventListener('keydown', (event) => {
-      if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
       const key = event.key;
+      
+      if (isFloating) return; // --- NEW: Disable typing when floating
+
       if (key === 'Backspace') {
         event.preventDefault();
         state.buffer = state.buffer.slice(0, -1);
         updateTyped();
         return;
       }
+
+      // Condition 1: User presses Enter
       if (key === 'Enter') {
         event.preventDefault();
-        dropWord(state.buffer, 0);
-        state.buffer = '';
-        updateTyped();
+        triggerFall(); // Use our new helper function
         return;
       }
+
+      // This is where we check the length
       if (key.length === 1) {
         state.buffer += key;
         updateTyped();
-        if (state.buffer.length > state.cols) {
-          const lastSpace = state.buffer.lastIndexOf(' ', state.cols - 1);
-          const cutIndex = lastSpace >= 0 ? lastSpace + 1 : 0;
-          const word = state.buffer.slice(cutIndex);
-          const startCol = cutIndex % state.cols;
-          state.buffer = state.buffer.slice(0, cutIndex);
-          updateTyped();
-          dropWord(word, startCol);
+
+        // Condition 2: Check if buffer length passes the random limit
+        if (state.buffer.length > currentCharLimit) {
+          triggerFall(); // Use our new helper function
         }
       }
     });
 
-    // Reset button logic
-    document.getElementById('resetBtn').addEventListener('click', () => {
-      Composite.allBodies(engine.world).forEach(b => {
-        if (!b.isStatic) World.remove(engine.world, b);
+    // --- UPDATED: Added click listener for restart button ---
+    window.addEventListener('load', () => {
+      document.body.focus();
+      document.getElementById('restart-button').addEventListener('click', () => {
+        location.reload();
       });
-      state.buffer = '';
-      updateTyped();
     });
-
-    window.addEventListener('load', () => document.body.focus());
-    window.addEventListener('resize', () => render.canvas.width = canvas.clientWidth);
   </script>
 </body>
 </html>
